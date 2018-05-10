@@ -1,4 +1,3 @@
-#! /usr/bin/env python
 import os
 import argparse
 import datetime
@@ -25,11 +24,11 @@ parser.add_argument('-save-best', type=bool, default=True, help='whether to save
 parser.add_argument('-shuffle', action='store_true', default=False, help='shuffle the data every epoch')
 # model
 parser.add_argument('-dropout', type=float, default=0.5, help='the probability for dropout [default: 0.5]')
-parser.add_argument('-max-norm', type=float, default=3.0, help='l2 constraint of parameters [default: 3.0]')
+# parser.add_argument('-max-norm', type=float, default=3.0, help='l2 constraint of parameters [default: 3.0]')
 parser.add_argument('-embed-dim', type=int, default=128, help='number of embedding dimension [default: 128]')
 parser.add_argument('-kernel-num', type=int, default=100, help='number of each kind of kernel')
 parser.add_argument('-kernel-sizes', type=str, default='3,4,5', help='comma-separated kernel size to use for convolution')
-parser.add_argument('-static', action='store_true', default=False, help='fix the embedding')
+#parser.add_argument('-static', action='store_true', default=False, help='fix the embedding')
 # device
 parser.add_argument('-device', type=int, default=-1, help='device to use for iterate data, -1 mean cpu [default: -1]')
 parser.add_argument('-no-cuda', action='store_true', default=False, help='disable the gpu')
@@ -57,8 +56,8 @@ def sst(text_field, label_field,  **kargs):
 # load MR dataset
 def mr(text_field, label_field, **kargs):
     train_data, dev_data = mydatasets.MR.splits(text_field, label_field)
-    text_field.build_vocab(train_data, dev_data)
-    label_field.build_vocab(train_data, dev_data)
+    text_field.build_vocab(train_data) # The original code builds vocab on both train and dev. Not the right way.
+    label_field.build_vocab(train_data)
     train_iter, dev_iter = data.Iterator.splits(
                                 (train_data, dev_data), 
                                 batch_sizes=(args.batch_size, len(dev_data)),
@@ -68,15 +67,17 @@ def mr(text_field, label_field, **kargs):
 
 # load data
 print("\nLoading data...")
-text_field = data.Field(lower=True)
-label_field = data.Field(sequential=False)
+
+# By default str.split() is the tokenizer
+text_field = data.Field(lower=True, sequential=True, use_vocab=True)
+label_field = data.Field(sequential=False) # use_vocab = True because the labels are str.
 train_iter, dev_iter = mr(text_field, label_field, device=-1, repeat=False)
 # train_iter, dev_iter, test_iter = sst(text_field, label_field, device=-1, repeat=False)
 
 
 # update args and print
 args.embed_num = len(text_field.vocab)
-args.class_num = len(label_field.vocab) - 1
+args.class_num = len(label_field.vocab) - 1 #TODO: I guess when we build the vocab we have a special index for <unk>
 args.cuda = (not args.no_cuda) and torch.cuda.is_available(); del args.no_cuda
 args.kernel_sizes = [int(k) for k in args.kernel_sizes.split(',')]
 args.save_dir = os.path.join(args.save_dir, datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
